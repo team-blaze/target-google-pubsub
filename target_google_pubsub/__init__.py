@@ -43,7 +43,7 @@ def publisher(config):
         if topic is None:
             topic = msg["stream"]
 
-        future = publisher.publish(topic, data=json.dumps(msg))
+        future = publisher.publish("{}/topic/{}".format(config.get("project_id"), topic), data=json.dumps(msg).encode("utf-8"), stream=msg["stream"])
         message_id = future.result()
         logger.info("{} successfully published".format(message_id))
 
@@ -131,17 +131,17 @@ def send_usage_stats():
         logger.debug("Collection request failed")
 
 
-def sync(buf=sys.stdin.buffer):
+def main(buf=sys.stdin.buffer):
     _, project_id = get_credentials()
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--config", help="Config file")
     args = parser.parse_args()
-    config = {"google_project_id": project_id}
+    config = {"project_id": project_id}
 
     if args.config:
         with open(args.config) as input:
-            config = config.update(json.load(input))
+            config.update(json.load(input))
 
     if not config.get("disable_collection", False):
         logger.info(
@@ -155,7 +155,8 @@ def sync(buf=sys.stdin.buffer):
     state = persist_lines(config, input)
     emit_state(state)
     logger.debug("Exiting normally")
+    return state
 
 
 if __name__ == "__main__":
-    sync()
+    main()
