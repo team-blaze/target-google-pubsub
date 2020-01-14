@@ -105,7 +105,7 @@ def persist_lines(config, lines):
             key_properties[stream] = o["key_properties"]
             publish(o)
         else:
-            raise Exception(
+            logger.debug(
                 "Unknown message type {} in message {}".format(o["type"], o)
             )
 
