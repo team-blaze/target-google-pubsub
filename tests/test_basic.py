@@ -21,15 +21,15 @@ def test_basic(monkeypatch):
     assert mock_publisher.call_count == 5 # one for each line in dummy_messages.txt
 
     calls = [
-        call('xyz/topic/users', data=b'{"type": "SCHEMA", "stream": "users", "key_properties": ["id"], "schema": {"required": ["id"], "type": "object", "properties": {"id": {"type": "integer"}}}}', stream='users'),
+        call('users', data=b'{"type": "SCHEMA", "stream": "users", "key_properties": ["id"], "schema": {"required": ["id"], "type": "object", "properties": {"id": {"type": "integer"}}}}', stream='users'),
          call().result(),
-         call('xyz/topic/users', data=b'{"type": "RECORD", "stream": "users", "record": {"id": 1, "name": "Chris"}}', stream='users'),
+         call('users', data=b'{"type": "RECORD", "stream": "users", "record": {"id": 1, "name": "Chris"}}', stream='users'),
          call().result(),
-         call('xyz/topic/users', data=b'{"type": "RECORD", "stream": "users", "record": {"id": 2, "name": "Mike"}}', stream='users'),
+         call('users', data=b'{"type": "RECORD", "stream": "users", "record": {"id": 2, "name": "Mike"}}', stream='users'),
          call().result(),
-         call('xyz/topic/locations', data=b'{"type": "SCHEMA", "stream": "locations", "key_properties": ["id"], "schema": {"required": ["id"], "type": "object", "properties": {"id": {"type": "integer"}}}}', stream='locations'),
+         call('locations', data=b'{"type": "SCHEMA", "stream": "locations", "key_properties": ["id"], "schema": {"required": ["id"], "type": "object", "properties": {"id": {"type": "integer"}}}}', stream='locations'),
          call().result(),
-         call('xyz/topic/locations', data=b'{"type": "RECORD", "stream": "locations", "record": {"id": 1, "name": "Philadelphia"}}', stream='locations'),
+         call('locations', data=b'{"type": "RECORD", "stream": "locations", "record": {"id": 1, "name": "Philadelphia"}}', stream='locations'),
          call().result()
     ]
 

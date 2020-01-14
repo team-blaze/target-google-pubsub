@@ -43,10 +43,7 @@ def publisher(config):
         if topic is None:
             topic = msg["stream"]
 
-
-        topic_path = publisher.topic_path(config.get("project_id"), topic)
-
-        future = publisher.publish(topic_path, data=json.dumps(msg).encode("utf-8"), stream=msg["stream"])
+        future = publisher.publish(topic, data=json.dumps(msg).encode("utf-8"), stream=msg["stream"])
         message_id = future.result()
         logger.info("{} successfully published".format(message_id))
 
