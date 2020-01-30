@@ -7,10 +7,11 @@ import threading
 import http.client
 import urllib
 import collections
-from google.cloud import pubsub_v1 as pubsub
+import hashlib
 import pkg_resources
-from jsonschema.validators import Draft4Validator
 import singer
+from jsonschema.validators import Draft4Validator
+from google.cloud import pubsub_v1 as pubsub
 from google.auth import default as get_credentials
 
 logger = singer.get_logger()
@@ -46,7 +47,9 @@ def publisher(config):
 
         topic_path = publisher.topic_path(config.get("project_id"), topic)
 
-        future = publisher.publish(topic_path, data=json.dumps(msg).encode("utf-8"), stream=msg["stream"])
+        future = publisher.publish(
+            topic_path, data=json.dumps(msg).encode("utf-8"), stream=msg["stream"]
+        )
         message_id = future.result()
         logger.info("{} successfully published".format(message_id))
 
@@ -54,9 +57,11 @@ def publisher(config):
 
 
 def persist_lines(config, lines):
-    state = None
+    state = {}
     schemas = {}
+    schema_hashes = {}
     key_properties = {}
+    bookmark_properties = {}
     validators = {}
 
     publish = publisher(config)
@@ -66,7 +71,7 @@ def persist_lines(config, lines):
         try:
             o = json.loads(line)
         except json.decoder.JSONDecodeError:
-            logger.error("Unable to parse:\n{}".format(line))
+            logger.error("Unable to parse JSON: {}".format(line))
             raise
 
         if "type" not in o:
@@ -75,49 +80,56 @@ def persist_lines(config, lines):
 
         if t == "RECORD":
             if "stream" not in o:
-                raise Exception(
-                    "Line is missing required key 'stream': {}".format(line)
-                )
+                raise Exception("Line is missing required key 'stream': {}".format(line))
             if o["stream"] not in schemas:
                 raise Exception(
-                    "A record for stream {} was encountered before a corresponding schema".format(
+                    "A record for stream '{}' was encountered before a corresponding schema".format(
                         o["stream"]
                     )
                 )
 
             # Validate record
             validators[o["stream"]].validate(o["record"])
-            publish(o)
-            state = None
+            msg = {
+                "stream": o["stream"],
+                "key_properties": key_properties[o["stream"]],
+                "record": o["record"],
+                "schema": schemas[o["stream"]],
+                "schema_hash": schema_hashes[o["stream"]],
+            }
+            if o["stream"] in bookmark_properties:
+                msg["bookmark_properties"] = bookmark_properties[o["stream"]]
+
+            publish(msg)
+
+            state[o["stream"]] = [o["record"][key] for key in key_properties[o["stream"]]]
         elif t == "STATE":
-            logger.debug("Setting state to {}".format(o["value"]))
-            # We don't need to forward state.
-            # As this is a target.
+            logger.debug("Setting state to: {}".format(o["value"]))
             state = o["value"]
+            # We don't need to forward state as this is a target.
         elif t == "SCHEMA":
             if "stream" not in o:
-                raise Exception(
-                    "Line is missing required key 'stream': {}".format(line)
-                )
+                raise Exception("Line is missing required key 'stream': {}".format(line))
             stream = o["stream"]
             schemas[stream] = o["schema"]
+            schema_hashes[stream] = hashlib.sha256(line.encode("utf-8")).hexdigest()
 
             validators[stream] = Draft4Validator(o["schema"])
             if "key_properties" not in o:
                 raise Exception("key_properties field is required")
             key_properties[stream] = o["key_properties"]
-            publish(o)
+            if "bookmark_properties" in o:
+                bookmark_properties[stream] = o["bookmark_properties"]
+            # We don't publish this as it'll be bundled in each message
         else:
-            logger.debug(
-                "Unknown message type {} in message {}".format(o["type"], o)
-            )
+            logger.debug("Unknown message type '{}' in message: {}".format(o["type"], o))
 
     return state
 
 
 def send_usage_stats():
     try:
-        version = pkg_resources.get_distribution("target-csv").version
+        version = pkg_resources.get_distribution("target-google-pubsub").version
         conn = http.client.HTTPConnection("collector.singer.io", timeout=10)
         conn.connect()
         params = {
@@ -130,8 +142,8 @@ def send_usage_stats():
         conn.request("GET", "/i?" + urllib.parse.urlencode(params))
         conn.getresponse()
         conn.close()
-    except:
-        logger.debug("Collection request failed")
+    except Exception as e:
+        logger.info("Collection request failed: {}".format(e))
 
 
 def main(buf=sys.stdin.buffer):

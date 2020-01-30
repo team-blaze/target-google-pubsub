@@ -1,0 +1,5 @@
+[flake8]
+builtins = raw_input
+ignore = E203, W503
+exclude =.git,.cache,.pytest_cache,.venv,virtualenv
+max-line-length = 100
