@@ -2,7 +2,7 @@
 name = "target-google-pubsub"
 
 build:
-	docker build . -t	$(name)
+	docker build . -t $(name)
 
 test: build
-	docker run -v $(PWD):/app $(name)
+	docker run --rm --name $(name) -v $(PWD):/app $(name)
