@@ -20,8 +20,8 @@ logger = singer.get_logger()
 def emit_state(state):
     if state is not None:
         line = json.dumps(state)
-        logger.debug("Emitting state {}".format(line))
-        sys.stdout.write("{}\n".format(line))
+        logger.info(f"Emitting state line: {line}")
+        sys.stdout.write(f"{line}\n")
         sys.stdout.flush()
 
 
@@ -40,18 +40,20 @@ def publisher(config):
     publisher = pubsub.PublisherClient()
 
     def publish(msg):
+        stream = msg["stream"]
         topic = config.get("topic")
 
         if topic is None:
-            topic = msg["stream"]
+            topic = stream
 
         topic_path = publisher.topic_path(config.get("project_id"), topic)
 
-        future = publisher.publish(
-            topic_path, data=json.dumps(msg).encode("utf-8"), stream=msg["stream"]
-        )
+        future = publisher.publish(topic_path, data=json.dumps(msg).encode("utf-8"), stream=stream)
         message_id = future.result()
-        logger.info("{} successfully published".format(message_id))
+        keys = msg.get("key_properties")
+        values = "-".join(str(msg.get("record", {}).get(p)) for p in keys) if len(keys) else None
+        extras = f" with key_properties '{keys}' and values '{values}'" if keys and values else ""
+        logger.info(f"Message '{message_id}' successfully published on stream '{stream}'{extras}")
 
     return publish
 
@@ -71,21 +73,19 @@ def persist_lines(config, lines):
         try:
             o = json.loads(line)
         except json.decoder.JSONDecodeError:
-            logger.error("Unable to parse JSON: {}".format(line))
+            logger.error(f"Unable to parse JSON: {line}")
             raise
 
         if "type" not in o:
-            raise Exception("Line is missing required key 'type': {}".format(line))
+            raise Exception(f"Line is missing required key 'type': {line}")
         t = o["type"]
 
         if t == "RECORD":
             if "stream" not in o:
-                raise Exception("Line is missing required key 'stream': {}".format(line))
+                raise Exception(f"Line is missing required key 'stream': {line}")
             if o["stream"] not in schemas:
                 raise Exception(
-                    "A record for stream '{}' was encountered before a corresponding schema".format(
-                        o["stream"]
-                    )
+                    f"A record for stream '{o['stream']}' was encountered before a schema"
                 )
 
             # Validate record
@@ -104,12 +104,12 @@ def persist_lines(config, lines):
 
             state[o["stream"]] = [o["record"][key] for key in key_properties[o["stream"]]]
         elif t == "STATE":
-            logger.debug("Setting state to: {}".format(o["value"]))
+            logger.debug(f"Setting state to: {o['value']}")
             state = o["value"]
             # We don't need to forward state as this is a target.
         elif t == "SCHEMA":
             if "stream" not in o:
-                raise Exception("Line is missing required key 'stream': {}".format(line))
+                raise Exception(f"Line is missing required key 'stream': {line}")
             stream = o["stream"]
             schemas[stream] = o["schema"]
             schema_hashes[stream] = hashlib.sha256(line.encode("utf-8")).hexdigest()
@@ -122,7 +122,7 @@ def persist_lines(config, lines):
                 bookmark_properties[stream] = o["bookmark_properties"]
             # We don't publish this as it'll be bundled in each message
         else:
-            logger.debug("Unknown message type '{}' in message: {}".format(o["type"], o))
+            logger.debug(f"Unknown message type '{o['type']}' in message: {o}")
 
     return state
 
@@ -143,7 +143,7 @@ def send_usage_stats():
         conn.getresponse()
         conn.close()
     except Exception as e:
-        logger.info("Collection request failed: {}".format(e))
+        logger.info(f"Collection request failed with error: {e}")
 
 
 def main(buf=sys.stdin.buffer):
