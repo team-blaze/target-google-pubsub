@@ -19,11 +19,10 @@ logger = singer.get_logger()
 
 
 def emit_state(state):
-    if state is not None:
-        line = json.dumps(state)
-        logger.info(f"Emitting state line: {line}")
-        sys.stdout.write(f"{line}\n")
-        sys.stdout.flush()
+    line = json.dumps(state)
+    logger.info(f"Emitting state line: {line}")
+    sys.stdout.write(f"{line}\n")
+    sys.stdout.flush()
 
 
 def flatten(d, parent_key="", sep="__"):
@@ -60,7 +59,7 @@ def publisher(config):
 
 
 def persist_lines(config, lines):
-    state = {}
+    state = ""
     schemas = {}
     schema_hashes = {}
     key_properties = {}
@@ -103,7 +102,7 @@ def persist_lines(config, lines):
 
             publish(msg)
 
-            state[o["stream"]] = [o["record"][key] for key in key_properties[o["stream"]]]
+            state = ""
         elif t == "STATE":
             logger.debug(f"Setting state to: {o['value']}")
             state = o["value"]
