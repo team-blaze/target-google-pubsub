@@ -73,7 +73,7 @@ def persist_lines(config, lines):
     for line in lines:
         line_count += 1
         try:
-            logger.debug(f"Parsing line {line_count} of {len(lines)}: {line}")
+            logger.debug(f"Parsing line {line_count}: {line}")
             o = json.loads(line)
         except json.decoder.JSONDecodeError:
             logger.error(f"Unable to parse JSON: {line}")
