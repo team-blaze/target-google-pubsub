@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import io
+import time
 import sys
 import json
 import threading
@@ -36,29 +37,37 @@ def flatten(d, parent_key="", sep="__"):
     return dict(items)
 
 
-def publisher(config):
-    publisher = pubsub.PublisherClient()
+class Publisher:
+    def __init__(self, config):
+        self.publisher = pubsub.PublisherClient()
+        self.config = config
+        self.futures = []
 
-    def publish(msg):
+    def publish(self, msg):
         stream = msg["stream"]
-        topic = config.get("topic")
+        topic = self.config.get("topic")
 
         if topic is None:
             topic = stream
 
-        topic_path = publisher.topic_path(config.get("project_id"), topic)
+        topic_path = publisher.topic_path(self.config.get("project_id"), topic)
 
         logger.debug("Actually publishing message")
-        future = publisher.publish(topic_path, data=json.dumps(msg).encode("utf-8"), stream=stream)
-        logger.debug("Waiting for future")
-        message_id = future.result()
+        self.futures.append(publisher.publish(topic_path, data=json.dumps(msg).encode("utf-8"), stream=stream))
         logger.debug("Getting log message details")
         keys = msg.get("key_properties")
         values = "-".join(str(msg.get("record", {}).get(p)) for p in keys) if len(keys) else None
         extras = f" with key_properties '{keys}' and values '{values}'" if keys and values else ""
-        logger.info(f"Message '{message_id}' successfully published on stream '{stream}'{extras}")
+        logger.info(f"Message queued on stream '{stream}'{extras}")
 
-    return publish
+    def wait_for_publish(self):
+        logger.debug("Waiting for all messages to be published")
+        while all([not future.done() for future in self.futures]):
+            logger.debug("Sleeping for 5s before checking again")
+            time.sleep(5)
+
+        logger.debug("All messages published - returning")
+
 
 
 def persist_lines(config, lines):
@@ -69,16 +78,12 @@ def persist_lines(config, lines):
     bookmark_properties = {}
     validators = {}
 
-    publish = publisher(config)
+    publisher = Publisher(config)
 
     # Loop over lines from stdin
     line_count = 0
     for line in lines:
         line_count += 1
-
-        # Recreate the publisher periodically - we were experiencing some crashes
-        if line_count % 1000 == 0:
-            publish = publisher(config)
 
         try:
             logger.debug(f"Parsing line {line_count}: {line}")
@@ -117,7 +122,7 @@ def persist_lines(config, lines):
                 msg["bookmark_properties"] = bookmark_properties[o["stream"]]
 
             logger.debug("About to publish message")
-            publish(msg)
+            publisher.publish(msg)
 
             state = ""
         elif t == "STATE":
@@ -140,6 +145,9 @@ def persist_lines(config, lines):
             # We don't publish this as it'll be bundled in each message
         else:
             logger.debug(f"Unknown message type '{o['type']}' in message: {o}")
+
+    # Wait for all the messages to be published before we exit
+    publisher.wait_for_publish()
 
     return state
 
