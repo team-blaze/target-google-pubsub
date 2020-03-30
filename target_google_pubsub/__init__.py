@@ -179,8 +179,8 @@ def main(buf=sys.stdin.buffer):
 
     logger.setLevel(getattr(logging, args.loglevel))
     # We need to override this to not get a tsunami...
-    if args.loglevel == "DEBUG":
-        logging.getLogger("google.cloud.pubsub_v1").setLevel(logging.INFO)
+    # if args.loglevel == "DEBUG":
+    #     logging.getLogger("google.cloud.pubsub_v1").setLevel(logging.INFO)
 
     config = {"project_id": project_id}
     with open(args.config) as input:
