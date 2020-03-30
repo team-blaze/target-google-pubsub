@@ -48,8 +48,11 @@ def publisher(config):
 
         topic_path = publisher.topic_path(config.get("project_id"), topic)
 
+        logger.debug("Actually publishing message")
         future = publisher.publish(topic_path, data=json.dumps(msg).encode("utf-8"), stream=stream)
+        logger.debug("Waiting for future")
         message_id = future.result()
+        logger.debug("Getting log message details")
         keys = msg.get("key_properties")
         values = "-".join(str(msg.get("record", {}).get(p)) for p in keys) if len(keys) else None
         extras = f" with key_properties '{keys}' and values '{values}'" if keys and values else ""
@@ -95,6 +98,7 @@ def persist_lines(config, lines):
 
             # Don't validate record for now
             # validators[o["stream"]].validate(o["record"])
+            logger.debug("Getting message details")
             msg = {
                 "stream": o["stream"],
                 "key_properties": key_properties[o["stream"]],
@@ -102,9 +106,12 @@ def persist_lines(config, lines):
                 "schema": schemas[o["stream"]],
                 "schema_hash": schema_hashes[o["stream"]],
             }
+            logger.debug("Checking bookmark properties")
             if o["stream"] in bookmark_properties:
+                logger.debug("Assigning bookmark properties")
                 msg["bookmark_properties"] = bookmark_properties[o["stream"]]
 
+            logger.debug("About to publish message")
             publish(msg)
 
             state = ""
