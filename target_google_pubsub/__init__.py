@@ -10,6 +10,7 @@ import collections
 import hashlib
 import pkg_resources
 import singer
+import logging
 from jsonschema.validators import Draft4Validator
 from google.cloud import pubsub_v1 as pubsub
 from google.auth import default as get_credentials
@@ -150,13 +151,26 @@ def main(buf=sys.stdin.buffer):
     _, project_id = get_credentials()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config", help="Config file")
+    parser.add_argument(
+        "-c",
+        "--config",
+        help='Config file. At least "topic" must be specified in a JSON object format.',
+        required=True,
+    )
+    parser.add_argument(
+        "-l",
+        "--loglevel",
+        help="Log level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+    )
     args = parser.parse_args()
-    config = {"project_id": project_id}
 
-    if args.config:
-        with open(args.config) as input:
-            config.update(json.load(input))
+    logger.setLevel(getattr(logging, args.loglevel))
+
+    config = {"project_id": project_id}
+    with open(args.config) as input:
+        config.update(json.load(input))
 
     if not config.get("disable_collection", False):
         logger.info(
