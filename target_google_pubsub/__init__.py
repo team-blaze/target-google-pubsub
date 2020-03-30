@@ -93,8 +93,8 @@ def persist_lines(config, lines):
                     f"A record for stream '{o['stream']}' was encountered before a schema"
                 )
 
-            # Validate record
-            validators[o["stream"]].validate(o["record"])
+            # Don't validate record for now
+            # validators[o["stream"]].validate(o["record"])
             msg = {
                 "stream": o["stream"],
                 "key_properties": key_properties[o["stream"]],
