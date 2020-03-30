@@ -53,7 +53,7 @@ class Publisher:
         topic_path = publisher.topic_path(self.config.get("project_id"), topic)
 
         logger.debug("Actually publishing message")
-        self.futures.append(publisher.publish(topic_path, data=json.dumps(msg).encode("utf-8"), stream=stream))
+        self.futures.append(self.publisher.publish(topic_path, data=json.dumps(msg).encode("utf-8"), stream=stream))
         logger.debug("Getting log message details")
         keys = msg.get("key_properties")
         values = "-".join(str(msg.get("record", {}).get(p)) for p in keys) if len(keys) else None
