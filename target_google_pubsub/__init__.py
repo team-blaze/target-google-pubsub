@@ -75,6 +75,11 @@ def persist_lines(config, lines):
     line_count = 0
     for line in lines:
         line_count += 1
+
+        # Recreate the publisher periodically - we were experiencing some crashes
+        if line_count % 1000 == 0:
+            publish = publisher(config)
+
         try:
             logger.debug(f"Parsing line {line_count}: {line}")
             o = json.loads(line)
