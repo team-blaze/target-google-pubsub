@@ -69,12 +69,17 @@ def persist_lines(config, lines):
     publish = publisher(config)
 
     # Loop over lines from stdin
+    line_count = 0
     for line in lines:
+        line_count += 1
         try:
+            logger.debug(f"Parsing line {line_count} of {len(lines)}: {line}")
             o = json.loads(line)
         except json.decoder.JSONDecodeError:
             logger.error(f"Unable to parse JSON: {line}")
             raise
+
+        logger.debug(f"Parsed line successfully - result is: {o}")
 
         if "type" not in o:
             raise Exception(f"Line is missing required key 'type': {line}")
