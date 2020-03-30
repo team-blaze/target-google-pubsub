@@ -61,6 +61,10 @@ class Publisher:
         logger.info(f"Message queued on stream '{stream}'{extras}")
 
     def wait_for_publish(self):
+        if len(self.futures) == 0:
+            logger.debug("No futures to wait on - returning")
+            return
+            
         logger.debug("Waiting for all messages to be published")
         while all([not future.done() for future in self.futures]):
             logger.debug("Sleeping for 5s before checking again")
