@@ -50,7 +50,7 @@ class Publisher:
         if topic is None:
             topic = stream
 
-        topic_path = publisher.topic_path(self.config.get("project_id"), topic)
+        topic_path = self.publisher.topic_path(self.config.get("project_id"), topic)
 
         logger.debug("Actually publishing message")
         self.futures.append(self.publisher.publish(topic_path, data=json.dumps(msg).encode("utf-8"), stream=stream))
