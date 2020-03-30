@@ -167,6 +167,9 @@ def main(buf=sys.stdin.buffer):
     args = parser.parse_args()
 
     logger.setLevel(getattr(logging, args.loglevel))
+    # We need to override this to not get a tsunami...
+    if args.loglevel == "DEBUG":
+        logging.getLogger("google.cloud.pubsub_v1").setLevel(logging.INFO)
 
     config = {"project_id": project_id}
     with open(args.config) as input:
@@ -181,7 +184,13 @@ def main(buf=sys.stdin.buffer):
         threading.Thread(target=send_usage_stats).start()
 
     input = io.TextIOWrapper(buf, encoding="utf-8")
-    state = persist_lines(config, input)
+
+    try:
+        state = persist_lines(config, input)
+    except Exception as e:
+        logger.error(f"Persisting lines failed with exception: {str(e)}")
+        raise
+
     emit_state(state)
     logger.debug("Exiting normally")
     return state
