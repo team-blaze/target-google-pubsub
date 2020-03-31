@@ -52,9 +52,7 @@ class Publisher:
 
         topic_path = self.publisher.topic_path(self.config.get("project_id"), topic)
 
-        logger.debug("Actually publishing message")
         self.futures.append(self.publisher.publish(topic_path, data=json.dumps(msg).encode("utf-8"), stream=stream))
-        logger.debug("Getting log message details")
         keys = msg.get("key_properties")
         values = "-".join(str(msg.get("record", {}).get(p)) for p in keys) if len(keys) else None
         extras = f" with key_properties '{keys}' and values '{values}'" if keys and values else ""
@@ -62,15 +60,15 @@ class Publisher:
 
     def wait_for_publish(self):
         if len(self.futures) == 0:
-            logger.debug("No futures to wait on - returning")
+            logger.info("No futures to wait on - returning")
             return
             
-        logger.debug("Waiting for all messages to be published")
+        logger.info("Waiting for all messages to be published")
         while all([not future.done() for future in self.futures]):
-            logger.debug("Sleeping for 5s before checking again")
+            logger.info("Sleeping for 5s before checking again")
             time.sleep(5)
 
-        logger.debug("All messages published - returning")
+        logger.info("All messages published - returning")
 
 
 
@@ -90,13 +88,11 @@ def persist_lines(config, lines):
         line_count += 1
 
         try:
-            logger.debug(f"Parsing line {line_count}: {line}")
+            logger.info(f"Processing message {line_count}: {line}")
             o = json.loads(line)
         except json.decoder.JSONDecodeError:
             logger.error(f"Unable to parse JSON: {line}")
             raise
-
-        logger.debug(f"Parsed line successfully - result is: {o}")
 
         if "type" not in o:
             raise Exception(f"Line is missing required key 'type': {line}")
@@ -112,7 +108,6 @@ def persist_lines(config, lines):
 
             # Don't validate record for now
             # validators[o["stream"]].validate(o["record"])
-            logger.debug("Getting message details")
             msg = {
                 "stream": o["stream"],
                 "key_properties": key_properties[o["stream"]],
@@ -120,17 +115,15 @@ def persist_lines(config, lines):
                 "schema": schemas[o["stream"]],
                 "schema_hash": schema_hashes[o["stream"]],
             }
-            logger.debug("Checking bookmark properties")
+
             if o["stream"] in bookmark_properties:
-                logger.debug("Assigning bookmark properties")
                 msg["bookmark_properties"] = bookmark_properties[o["stream"]]
 
-            logger.debug("About to publish message")
             publisher.publish(msg)
 
             state = ""
         elif t == "STATE":
-            logger.debug(f"Setting state to: {o['value']}")
+            logger.info(f"Setting state to: {o['value']}")
             state = o["value"]
             # We don't need to forward state as this is a target.
         elif t == "SCHEMA":
@@ -148,7 +141,7 @@ def persist_lines(config, lines):
                 bookmark_properties[stream] = o["bookmark_properties"]
             # We don't publish this as it'll be bundled in each message
         else:
-            logger.debug(f"Unknown message type '{o['type']}' in message: {o}")
+            logger.info(f"Unknown message type '{o['type']}' in message: {o}")
 
     # Wait for all the messages to be published before we exit
     publisher.wait_for_publish()
@@ -196,8 +189,8 @@ def main(buf=sys.stdin.buffer):
 
     logger.setLevel(getattr(logging, args.loglevel))
     # We need to override this to not get a tsunami...
-    # if args.loglevel == "DEBUG":
-    #     logging.getLogger("google.cloud.pubsub_v1").setLevel(logging.INFO)
+    if args.loglevel == "DEBUG":
+        logging.getLogger("google.cloud.pubsub_v1").setLevel(logging.INFO)
 
     config = {"project_id": project_id}
     with open(args.config) as input:
@@ -220,7 +213,7 @@ def main(buf=sys.stdin.buffer):
         raise
 
     emit_state(state)
-    logger.debug("Exiting normally")
+    logger.info("Exiting normally")
     return state
 
 
